@@ -123,8 +123,29 @@ h2{font-size:20px;font-weight:400;color:#9aa0b5;margin-top:4px}
   background:linear-gradient(90deg,#c084fc,#818cf8);
 }
 
-.toggle{
+.controls{
   margin-top:26px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+}
+
+.ctrl{
+  padding:0;
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  border:none;
+  cursor:pointer;
+  font-size:20px;
+  color:#fff;
+  background:rgba(255,255,255,.08);
+  transition:transform .15s,background .15s;
+}
+.ctrl:hover{transform:scale(1.1);background:rgba(255,255,255,.16)}
+
+.toggle{
   padding:0;
   width:64px;
   height:64px;

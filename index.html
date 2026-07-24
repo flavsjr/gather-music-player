@@ -37,16 +37,18 @@
   <!-- barra progresso -->
   <div class="progress"><div class="bar" id="bar"></div></div>
 
-  <!-- controle toggle play/pause -->
-  <button id="toggleBtn" class="toggle">▶</button>
+  <!-- controles -->
+  <div class="controls">
+    <button id="prevBtn" class="ctrl">⏮</button>
+    <button id="toggleBtn" class="toggle">▶</button>
+    <button id="nextBtn" class="ctrl">⏭</button>
+  </div>
 
   <button id="playButton" class="hidden">▶ Clique para ouvir</button>
 
 </div>
 
-<audio id="audio" autoplay loop>
-  <source src="Trap vibes @147bpm - flavs (1).wav" type="audio/wav">
-</audio>
+<audio id="audio" autoplay></audio>
 
 <script src="script.js"></script>
 </body>
