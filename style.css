@@ -160,6 +160,37 @@ h2{font-size:20px;font-weight:400;color:#9aa0b5;margin-top:4px}
 }
 .toggle:hover{transform:scale(1.1)}
 
+.volume{
+  margin-top:24px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+#volIcon{cursor:pointer;font-size:22px;user-select:none}
+#vol{
+  -webkit-appearance:none;
+  appearance:none;
+  width:180px;
+  max-width:50vw;
+  height:5px;
+  border-radius:5px;
+  background:rgba(255,255,255,.15);
+  cursor:pointer;
+}
+#vol::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:16px;height:16px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#c084fc,#818cf8);
+  box-shadow:0 0 10px rgba(124,58,237,.8);
+}
+#vol::-moz-range-thumb{
+  width:16px;height:16px;border:none;
+  border-radius:50%;
+  background:linear-gradient(135deg,#c084fc,#818cf8);
+}
+
 button{
   margin-top:34px;
   padding:18px 44px;

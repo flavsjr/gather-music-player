@@ -13,7 +13,7 @@ const artistEl = document.getElementById("artist");
 const playlist = [
   { file:"Glory Days - Trap Beat - 147 BPM (prod. flavs).wav", title:"Glory Days",   artist:"prod. flavs" },
   { file:"Space Travel - Trap Beat - 146 BPM (prod. flavs).wav", title:"Space Travel", artist:"prod. flavs" },
-  { file:"The Abbot - On The Radar - Freestyle (OTR Brazil 🇧🇷).mp3", title:"The Abbot", artist:"OTR Brazil 🇧🇷" },
+  { file:"Abbot - On The Radar Freestyle - On The Radar.mp3", title:"The Abbot", artist:"On The Radar" },
 ];
 let idx = 0;
 
@@ -45,6 +45,22 @@ function pause(){
 toggle.onclick = () => audio.paused ? audio.play() : audio.pause();
 nextB.onclick  = next;
 prevB.onclick  = prev;
+
+// volume
+const vol     = document.getElementById("vol");
+const volIcon = document.getElementById("volIcon");
+let lastVol = 1;
+
+function updIcon(){
+  volIcon.textContent = audio.volume === 0 ? "🔇" : audio.volume < 0.5 ? "🔉" : "🔊";
+}
+vol.oninput = () => { audio.volume = +vol.value; if(audio.volume>0) lastVol = audio.volume; updIcon(); };
+volIcon.onclick = () => {
+  if(audio.volume > 0){ lastVol = audio.volume; audio.volume = 0; }
+  else audio.volume = lastVol || 1;
+  vol.value = audio.volume;
+  updIcon();
+};
 
 // auto-avanca no fim da faixa
 audio.addEventListener("ended", next);
