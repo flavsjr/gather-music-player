@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glory Days — Flavs</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- fundo animado -->
+<canvas id="bg"></canvas>
+
+<div class="player">
+
+  <!-- vinil girando com a capa -->
+  <div class="vinyl" id="vinyl">
+    <img src="cover.jpg" class="cover" alt="" onerror="this.style.display='none';document.getElementById('coverFallback').style.display='flex'">
+    <div class="cover-fallback" id="coverFallback">🎧</div>
+    <div class="vinyl-hole"></div>
+  </div>
+
+  <div class="meta">
+    <div class="now">🎧 NOW PLAYING</div>
+    <h1 id="title">Glory Days</h1>
+    <h2 id="artist">Flavs</h2>
+  </div>
+
+  <!-- equalizador -->
+  <div class="eq" id="eq">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <!-- barra progresso -->
+  <div class="progress"><div class="bar" id="bar"></div></div>
+
+  <!-- controle toggle play/pause -->
+  <button id="toggleBtn" class="toggle">▶</button>
+
+  <button id="playButton" class="hidden">▶ Clique para ouvir</button>
+
+</div>
+
+<audio id="audio" autoplay loop>
+  <source src="Trap vibes @147bpm - flavs (1).wav" type="audio/wav">
+</audio>
+
+<script src="script.js"></script>
+</body>
+</html>
