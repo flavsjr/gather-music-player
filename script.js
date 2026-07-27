@@ -9,18 +9,74 @@ const nextB  = document.getElementById("nextBtn");
 const titleEl  = document.getElementById("title");
 const artistEl = document.getElementById("artist");
 
-// ===== PLAYLIST — add sons aqui: {file, title, artist} =====
-const playlist = [
-  { file:"Glory Days - Trap Beat - 147 BPM (prod. flavs).wav", title:"Glory Days",   artist:"prod. flavs" },
-  { file:"Space Travel - Trap Beat - 146 BPM (prod. flavs).wav", title:"Space Travel", artist:"prod. flavs" },
-  { file:"Abbot - On The Radar Freestyle - On The Radar.mp3", title:"The Abbot", artist:"On The Radar" },
+// ===== PLAYLIST =====
+// Basta jogar os arquivos de audio dentro da pasta /musicas.
+// Nome do arquivo vira titulo/artista: "Titulo - ... (prod. fulano).ext"
+const PASTA = "musicas/";
+const EXTS  = /\.(mp3|wav|ogg|m4a|flac|aac|opus|webm)$/i;
+
+// usado so quando abre via file:// (fetch bloqueado) — nao precisa manter
+const FALLBACK = [
+  "Abbot - On The Radar Freestyle - On The Radar.mp3",
+  "Glory Days - Trap Beat - 147 BPM (prod. flavs).wav",
 ];
+
+let playlist = [];
 let idx = 0;
 
+function parseNome(file){
+  const base  = file.replace(EXTS, "");
+  const parts = base.split(" - ").map(s => s.trim()).filter(Boolean);
+  const prod  = base.match(/\(([^)]*prod[^)]*)\)/i);
+  return {
+    file,
+    title:  parts[0] || base,
+    artist: prod ? prod[1] : (parts.length > 1 ? parts[parts.length - 1] : ""),
+  };
+}
+
+// le playlist.json — opcional. So serve pra 2 coisas:
+//   a) corrigir titulo/artista quando o nome do arquivo engana
+//   b) listar as faixas em host sem listagem de diretorio (ex: GitHub Pages)
+async function lerManifesto(){
+  try{
+    const json  = await (await fetch(PASTA + "playlist.json")).json();
+    const files = [], meta = {};
+    for(const x of json){
+      const f = typeof x === "string" ? x : x.file;
+      if(!f) continue;
+      files.push(f);
+      if(typeof x === "object" && (x.title || x.artist)) meta[f] = x;
+    }
+    return { files, meta };
+  }catch(e){ return { files: [], meta: {} }; }   // sem manifesto
+}
+
+// descobre os arquivos: listagem de diretorio > manifesto > FALLBACK
+async function listarArquivos(){
+  try{
+    const html = await (await fetch(PASTA)).text();
+    const doc  = new DOMParser().parseFromString(html, "text/html");
+    const files = [...doc.querySelectorAll("a[href]")]
+      .map(a => decodeURIComponent(a.getAttribute("href").split("/").pop()))
+      .filter(n => EXTS.test(n));
+    if(files.length) return files;
+  }catch(e){ /* sem listagem de diretorio */ }
+  return null;
+}
+
+async function carregarPlaylist(){
+  const [porPasta, manifesto] = await Promise.all([listarArquivos(), lerManifesto()]);
+  const files = porPasta || (manifesto.files.length ? manifesto.files : FALLBACK);
+  // nome do arquivo manda, manifesto so sobrescreve titulo/artista
+  return files.map(f => Object.assign(parseNome(f), manifesto.meta[f]));
+}
+
 function load(i, autoplay=true){
+  if(!playlist.length) return;
   idx = (i + playlist.length) % playlist.length;   // wrap circular
   const t = playlist[idx];
-  audio.src = t.file;
+  audio.src = PASTA + encodeURIComponent(t.file);
   titleEl.textContent  = t.title;
   artistEl.textContent = t.artist;
   bar.style.width = "0%";
@@ -65,8 +121,20 @@ volIcon.onclick = () => {
 // auto-avanca no fim da faixa
 audio.addEventListener("ended", next);
 
-// carrega 1a faixa + tenta autoplay
-load(0);
+// embaralha (Fisher-Yates) — ordem nova a cada refresh
+function embaralhar(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// varre a pasta, monta playlist, carrega 1a faixa + tenta autoplay
+carregarPlaylist().then(faixas => {
+  playlist = embaralhar(faixas);
+  load(0);
+});
 
 button.onclick = () => audio.play().then(play);
 
