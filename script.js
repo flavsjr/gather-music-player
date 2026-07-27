@@ -72,6 +72,22 @@ async function carregarPlaylist(){
   return files.map(f => Object.assign(parseNome(f), manifesto.meta[f]));
 }
 
+// ===== CORES =====
+// Sorteia uma matiz nova por faixa e deriva a paleta dela, entao as 3 cores
+// sempre combinam. Evita o verde-amarelado (60-160), que fica feio no escuro.
+let corParticula = "rgba(160,110,255,.6)";
+
+function sortearCores(){
+  let h = Math.floor(Math.random() * 360);
+  if(h > 60 && h < 160) h = (h + 140) % 360;
+  const raiz = document.documentElement.style;
+  raiz.setProperty("--c1",   `hsl(${h} 90% 74%)`);
+  raiz.setProperty("--c2",   `hsl(${(h + 40) % 360} 85% 68%)`);
+  raiz.setProperty("--c3",   `hsl(${(h + 20) % 360} 78% 56%)`);
+  raiz.setProperty("--glow", `hsla(${h}, 85%, 55%, .55)`);
+  corParticula = `hsla(${h}, 80%, 72%, .6)`;
+}
+
 function load(i, autoplay=true){
   if(!playlist.length) return;
   idx = (i + playlist.length) % playlist.length;   // wrap circular
@@ -80,6 +96,7 @@ function load(i, autoplay=true){
   titleEl.textContent  = t.title;
   artistEl.textContent = t.artist;
   bar.style.width = "0%";
+  sortearCores();
   if(autoplay) audio.play().then(play).catch(() => button.classList.remove("hidden"));
 }
 
@@ -171,7 +188,7 @@ function loop(){
     if(p.y<0||p.y>H) p.dy*=-1;
     ctx.beginPath();
     ctx.arc(p.x,p.y,p.r,0,7);
-    ctx.fillStyle = "rgba(160,110,255,.6)";
+    ctx.fillStyle = corParticula;   // acompanha a cor da faixa
     ctx.fill();
   }
   requestAnimationFrame(loop);
