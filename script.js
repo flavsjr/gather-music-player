@@ -73,13 +73,16 @@ async function carregarPlaylist(){
 }
 
 // ===== CORES =====
-// Sorteia uma matiz nova por faixa e deriva a paleta dela, entao as 3 cores
-// sempre combinam. Evita o verde-amarelado (60-160), que fica feio no escuro.
+// Sorteia uma matiz nova por faixa e deriva a paleta dela (+20 e +40), entao
+// as 3 cores sempre combinam. O verde-amarelado (60-160) fica ruim no fundo
+// escuro, e nao basta desviar a matiz base: as derivadas cairiam nele do
+// mesmo jeito. Sorteia direto no espaco que mantem as tres fora — [0,20] e
+// [160,359], que dao vermelho, laranja, ciano, azul, roxo, magenta e rosa.
 let corParticula = "rgba(160,110,255,.6)";
 
 function sortearCores(){
-  let h = Math.floor(Math.random() * 360);
-  if(h > 60 && h < 160) h = (h + 140) % 360;
+  const n = Math.floor(Math.random() * 221);
+  const h = n <= 20 ? n : n - 21 + 160;
   const raiz = document.documentElement.style;
   raiz.setProperty("--c1",   `hsl(${h} 90% 74%)`);
   raiz.setProperty("--c2",   `hsl(${(h + 40) % 360} 85% 68%)`);
@@ -125,7 +128,10 @@ const volIcon = document.getElementById("volIcon");
 let lastVol = 1;
 
 function updIcon(){
-  volIcon.textContent = audio.volume === 0 ? "🔇" : audio.volume < 0.5 ? "🔉" : "🔊";
+  const mudo = audio.volume === 0;
+  volIcon.classList.toggle("mute", mudo);
+  volIcon.classList.toggle("baixo", !mudo && audio.volume < 0.5);
+  volIcon.setAttribute("aria-label", mudo ? "Tirar do mudo" : "Mudo");
 }
 vol.oninput = () => { audio.volume = +vol.value; if(audio.volume>0) lastVol = audio.volume; updIcon(); };
 volIcon.onclick = () => {

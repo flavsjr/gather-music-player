@@ -44,9 +44,16 @@
     <button id="nextBtn" class="ctrl">⏭</button>
   </div>
 
-  <!-- volume -->
+  <!-- volume — icone em SVG (nao emoji) pra herdar a cor da faixa -->
   <div class="volume">
-    <span id="volIcon">🔊</span>
+    <button id="volIcon" type="button" aria-label="Mudo">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="corpo" d="M3 9v6h4l5 4V5L7 9z"/>
+        <path class="onda o1" d="M15.4 8.8a4.6 4.6 0 0 1 0 6.4"/>
+        <path class="onda o2" d="M18.6 5.7a9 9 0 0 1 0 12.6"/>
+        <path class="mudo" d="M16 9.5l5.5 5M21.5 9.5l-5.5 5"/>
+      </svg>
+    </button>
     <input type="range" id="vol" min="0" max="1" step="0.01" value="1">
   </div>
 

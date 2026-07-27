@@ -182,7 +182,25 @@ h2{font-size:clamp(15px,2.4vh,20px);font-weight:400;color:#9aa0b5;margin-top:4px
   justify-content:center;
   gap:12px;
 }
-#volIcon{cursor:pointer;font-size:22px;user-select:none}
+#volIcon{
+  background:none;
+  border:0;
+  padding:0;
+  line-height:0;
+  cursor:pointer;
+  color:var(--c1);              /* o SVG usa currentColor */
+  transition:color .6s ease,transform .15s;
+}
+#volIcon:hover{transform:scale(1.12)}
+#volIcon svg{width:clamp(20px,2.8vh,24px);height:clamp(20px,2.8vh,24px);display:block}
+#volIcon .corpo{fill:currentColor}
+#volIcon .onda,
+#volIcon .mudo{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+/* estados: .baixo esconde a onda externa, .mute troca as ondas pelo X */
+#volIcon .mudo{display:none}
+#volIcon.baixo .o2{display:none}
+#volIcon.mute .onda{display:none}
+#volIcon.mute .mudo{display:block}
 #vol{
   -webkit-appearance:none;
   appearance:none;
