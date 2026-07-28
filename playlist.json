@@ -1,0 +1,42 @@
+{
+  "_ajuda": [
+    "Dois modos. 'list' ganha se os dois vierem preenchidos.",
+    "MODO A - playlist inteira do YouTube: cole em 'list' o ID da playlist,",
+    "  que e o pedaco depois de 'list=' na URL. Ex: .../playlist?list=PLabc123 -> 'PLabc123'.",
+    "  A playlist precisa estar Publica ou Nao listada. Privada nao carrega em embed.",
+    "MODO B - faixas na mao: deixe 'list' vazio e preencha 'videos'.",
+    "  'id' e o pedaco depois de 'v=' na URL. Ex: .../watch?v=dQw4w9WgXcQ -> 'dQw4w9WgXcQ'.",
+    "  'title' e 'artist' sao opcionais: sem eles o player usa o titulo do proprio video.",
+    "'shuffle' embaralha nos dois modos."
+  ],
+
+  "list": "",
+  "shuffle": true,
+
+  "videos": [
+    { "id": "Cf3GeYytJvI" },
+    { "id": "47KfZNEMYqY" },
+    { "id": "Nd_Td9pA1fU" },
+    { "id": "Z3_jY015bsE" },
+    { "id": "gfjCJvbfbGs" },
+    { "id": "deeMQwM0u6c" },
+    { "id": "JiNxvNtlBPM" },
+    { "id": "zKSaL0bJJvc" },
+    { "id": "_pqiY9FbWd8" },
+    { "id": "afLW6svh-8U" },
+    { "id": "dlLdnd3VF-0" },
+    { "id": "9aEmqlZ8uEg" },
+    { "id": "QVG6VY-PFGk" },
+    { "id": "lMEosCH4qYg" },
+    { "id": "FpNaf6tKy1E" },
+    { "id": "XHtPPD0ovGw" },
+    { "id": "X2yqGmFB3uE" },
+    { "id": "gkL_-M99rUI" },
+    { "id": "lX9DHtU0pII" },
+    { "id": "f6HNpJ0GSYM" },
+    { "id": "kschkSGZN6w" },
+    { "id": "8q5VpHzYBUI" },
+    { "id": "2JENLWwjJSQ" },
+    { "id": "5lSVsAPn_YI" }
+  ]
+}
