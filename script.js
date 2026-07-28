@@ -1,75 +1,60 @@
-const audio  = document.getElementById("audio");
-const button = document.getElementById("playButton");
 const vinyl  = document.getElementById("vinyl");
 const eq     = document.getElementById("eq");
 const bar    = document.getElementById("bar");
 const toggle = document.getElementById("toggleBtn");
 const prevB  = document.getElementById("prevBtn");
 const nextB  = document.getElementById("nextBtn");
-const titleEl  = document.getElementById("title");
-const artistEl = document.getElementById("artist");
+const titleEl   = document.getElementById("title");
+const artistEl  = document.getElementById("artist");
+const cover     = document.getElementById("cover");
+const coverFall = document.getElementById("coverFallback");
+const vol       = document.getElementById("vol");
+const volIcon   = document.getElementById("volIcon");
+const avisoMudo = document.getElementById("avisoMudo");
 
 // ===== PLAYLIST =====
-// Basta jogar os arquivos de audio dentro da pasta /musicas.
-// Nome do arquivo vira titulo/artista: "Titulo - ... (prod. fulano).ext"
-const PASTA = "musicas/";
-const EXTS  = /\.(mp3|wav|ogg|m4a|flac|aac|opus|webm)$/i;
+// Configuracao vem de playlist.json (ver o "_ajuda" la dentro).
+// Se o fetch falhar — abrir via file:// bloqueia — cai neste PADRAO.
+// Pra testar sem servidor, e so preencher aqui.
+const PADRAO = {
+  list: "",
+  shuffle: true,
+  videos: [],
+};
 
-// usado so quando abre via file:// (fetch bloqueado) — nao precisa manter
-const FALLBACK = [
-  "Abbot - On The Radar Freestyle - On The Radar.mp3",
-  "Glory Days - Trap Beat - 147 BPM (prod. flavs).wav",
-];
+let cfg        = PADRAO;
+let modoLista  = false;   // true = playlist do YouTube, false = lista na mao
+let faixas     = [];      // modo B
+let meta       = {};      // modo B: id -> {title, artist} vindos do json
+let idx        = 0;
+let player;
+let pronto     = false;
+let videoAtual = "";
+let errosSeguidos = 0;
+let esperaMeta = null, tentativasMeta = 0, esperandoId = "";   // metadata do YouTube chega atrasada
+let aguardandoGesto = false, tGesto = 0;   // autoplay barrado: tocando mudo ate o 1o clique
+let erroConfig = "";
 
-let playlist = [];
-let idx = 0;
+// ===== NOME DA FAIXA =====
+// Titulo do YouTube vem sujo: "Artista - Musica (Official Video) [4K]".
+// Tira o lixo de producao mas preserva "(prod. fulano)", que e credito.
+const LIXO = /\s*[\(\[][^)\]]*(?:official|oficial|video|v[ií]deo|clipe|audio|[áa]udio|lyric|letra|legendado|visualizer|hd|4k|mv|explicit)[^)\]]*[\)\]]/gi;
 
-function parseNome(file){
-  const base  = file.replace(EXTS, "");
-  const parts = base.split(" - ").map(s => s.trim()).filter(Boolean);
+function limpar(s){
+  return (s || "").replace(LIXO, "").replace(/\s{2,}/g, " ").trim();
+}
+
+// YouTube usa "Artista - Musica" — ordem inversa dos arquivos locais.
+function parseTitulo(rawTitle, rawAuthor){
+  const base  = limpar(rawTitle);
   const prod  = base.match(/\(([^)]*prod[^)]*)\)/i);
-  return {
-    file,
-    title:  parts[0] || base,
-    artist: prod ? prod[1] : (parts.length > 1 ? parts[parts.length - 1] : ""),
-  };
-}
+  const parts = base.split(" - ").map(s => s.trim()).filter(Boolean);
+  const canal = (rawAuthor || "").replace(/\s*-\s*Topic$/i, "").trim();
 
-// le playlist.json — opcional. So serve pra 2 coisas:
-//   a) corrigir titulo/artista quando o nome do arquivo engana
-//   b) listar as faixas em host sem listagem de diretorio (ex: GitHub Pages)
-async function lerManifesto(){
-  try{
-    const json  = await (await fetch(PASTA + "playlist.json")).json();
-    const files = [], meta = {};
-    for(const x of json){
-      const f = typeof x === "string" ? x : x.file;
-      if(!f) continue;
-      files.push(f);
-      if(typeof x === "object" && (x.title || x.artist)) meta[f] = x;
-    }
-    return { files, meta };
-  }catch(e){ return { files: [], meta: {} }; }   // sem manifesto
-}
-
-// descobre os arquivos: listagem de diretorio > manifesto > FALLBACK
-async function listarArquivos(){
-  try{
-    const html = await (await fetch(PASTA)).text();
-    const doc  = new DOMParser().parseFromString(html, "text/html");
-    const files = [...doc.querySelectorAll("a[href]")]
-      .map(a => decodeURIComponent(a.getAttribute("href").split("/").pop()))
-      .filter(n => EXTS.test(n));
-    if(files.length) return files;
-  }catch(e){ /* sem listagem de diretorio */ }
-  return null;
-}
-
-async function carregarPlaylist(){
-  const [porPasta, manifesto] = await Promise.all([listarArquivos(), lerManifesto()]);
-  const files = porPasta || (manifesto.files.length ? manifesto.files : FALLBACK);
-  // nome do arquivo manda, manifesto so sobrescreve titulo/artista
-  return files.map(f => Object.assign(parseNome(f), manifesto.meta[f]));
+  if(parts.length > 1){
+    return { title: parts.slice(1).join(" - "), artist: prod ? prod[1] : parts[0] };
+  }
+  return { title: base, artist: prod ? prod[1] : canal };
 }
 
 // ===== CORES =====
@@ -91,25 +76,28 @@ function sortearCores(){
   corParticula = `hsla(${h}, 80%, 72%, .6)`;
 }
 
-function load(i, autoplay=true){
-  if(!playlist.length) return;
-  idx = (i + playlist.length) % playlist.length;   // wrap circular
-  const t = playlist[idx];
-  audio.src = PASTA + encodeURIComponent(t.file);
-  titleEl.textContent  = t.title;
-  artistEl.textContent = t.artist;
-  bar.style.width = "0%";
-  sortearCores();
-  if(autoplay) audio.play().then(play).catch(() => button.classList.remove("hidden"));
+// ===== CAPA =====
+// maxresdefault nao existe pra todo video; cai pro hqdefault, que sempre existe.
+function setCover(id){
+  cover.dataset.tentativa = "max";
+  cover.style.display = "";
+  coverFall.style.display = "none";
+  cover.src = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
 }
+cover.onerror = () => {
+  if(cover.dataset.tentativa === "max"){
+    cover.dataset.tentativa = "hq";
+    cover.src = cover.src.replace("maxresdefault", "hqdefault");
+    return;
+  }
+  cover.style.display = "none";
+  coverFall.style.display = "flex";
+};
 
-function next(){ load(idx + 1); }
-function prev(){ load(idx - 1); }
-
+// ===== UI =====
 function play(){
   vinyl.classList.add("playing");
   eq.classList.add("playing");
-  button.classList.add("hidden");
   toggle.textContent = "⏸";
 }
 function pause(){
@@ -118,31 +106,188 @@ function pause(){
   toggle.textContent = "▶";
 }
 
-toggle.onclick = () => audio.paused ? audio.play() : audio.pause();
-nextB.onclick  = next;
-prevB.onclick  = prev;
+function avisar(msg){
+  titleEl.textContent  = msg;
+  artistEl.textContent = "";
+}
 
-// volume
-const vol     = document.getElementById("vol");
-const volIcon = document.getElementById("volIcon");
+// So mexe na tela quando o video muda de verdade — onStateChange dispara varias
+// vezes por faixa e nao queremos re-sortear a cor a cada pause/play.
+function atualizarFaixa(){
+  if(!player || !player.getVideoData) return;
+  const d = player.getVideoData();
+  if(!d || !d.video_id || d.video_id === videoAtual) return;
+
+  // contador e por faixa: uma que estourou o limite nao pode cegar a proxima
+  if(d.video_id !== esperandoId){ esperandoId = d.video_id; tentativasMeta = 0; }
+
+  // Na troca de faixa o video_id chega antes do title/author. Fechar o guard
+  // aqui perderia a metadata pra sempre — ela so chega no proximo tick, e o
+  // proximo tick veria id igual e sairia. Entao espera o titulo aparecer.
+  if(!d.title && tentativasMeta < 40){
+    tentativasMeta++;
+    clearTimeout(esperaMeta);
+    esperaMeta = setTimeout(atualizarFaixa, 120);
+    return;
+  }
+  clearTimeout(esperaMeta);
+  tentativasMeta = 0;
+
+  videoAtual = d.video_id;
+  errosSeguidos = 0;
+
+  const over = meta[d.video_id] || {};
+  const p    = parseTitulo(d.title, d.author);
+  titleEl.textContent  = over.title  || p.title  || "—";
+  artistEl.textContent = over.artist || p.artist || "";
+  bar.style.width = "0%";
+  setCover(d.video_id);
+  sortearCores();
+}
+
+// ===== CONTROLES =====
+function carregarManual(i){
+  if(!faixas.length) return;
+  idx = (i + faixas.length) % faixas.length;   // wrap circular
+  player.loadVideoById(faixas[idx].id);
+}
+function next(){ modoLista ? player.nextVideo()     : carregarManual(idx + 1); }
+function prev(){ modoLista ? player.previousVideo() : carregarManual(idx - 1); }
+
+// O gesto que liga o som (ver acordarSom) nao pode valer como clique nos
+// controles: sem isso, o clique no ▶ ligaria o som e pausaria no mesmo ato.
+function gestoDoSom(){ return Date.now() - tGesto < 400; }
+
+toggle.onclick = () => {
+  if(!pronto || gestoDoSom()) return;
+  if(player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
+  else player.playVideo();
+};
+nextB.onclick = () => pronto && !gestoDoSom() && next();
+prevB.onclick = () => pronto && !gestoDoSom() && prev();
+
+// ===== VOLUME =====
 let lastVol = 1;
 
-function updIcon(){
-  const mudo = audio.volume === 0;
+function updIcon(v){
+  const mudo = v === 0 || aguardandoGesto;
   volIcon.classList.toggle("mute", mudo);
-  volIcon.classList.toggle("baixo", !mudo && audio.volume < 0.5);
+  volIcon.classList.toggle("baixo", !mudo && v < 0.5);
   volIcon.setAttribute("aria-label", mudo ? "Tirar do mudo" : "Mudo");
 }
-vol.oninput = () => { audio.volume = +vol.value; if(audio.volume>0) lastVol = audio.volume; updIcon(); };
+function aplicarVolume(v){
+  vol.value = v;
+  if(pronto){
+    player.setVolume(v * 100);
+    // enquanto espera o gesto o player segue mudo, senao o browser pausa tudo
+    if(aguardandoGesto) player.mute();
+    else v > 0 ? player.unMute() : player.mute();   // so setVolume(0) nao tira do mute
+  }
+  updIcon(v);
+}
+vol.oninput = () => {
+  const v = +vol.value;
+  if(v > 0) lastVol = v;
+  aplicarVolume(v);
+};
 volIcon.onclick = () => {
-  if(audio.volume > 0){ lastVol = audio.volume; audio.volume = 0; }
-  else audio.volume = lastVol || 1;
-  vol.value = audio.volume;
-  updIcon();
+  if(gestoDoSom()) return;   // esse clique so ligou o som
+  const v = +vol.value;
+  if(v > 0){ lastVol = v; aplicarVolume(0); }
+  else aplicarVolume(lastVol || 1);
 };
 
-// auto-avanca no fim da faixa
-audio.addEventListener("ended", next);
+// ===== YOUTUBE =====
+// Sem timeupdate: o iframe nao emite progresso, entao consulta em intervalo.
+setInterval(() => {
+  if(!pronto || !player.getDuration) return;
+  const d = player.getDuration();
+  if(d > 0) bar.style.width = (player.getCurrentTime() / d * 100) + "%";
+}, 250);
+
+// ===== AUTOPLAY =====
+// Autoplay COM som so passa se o browser ja confia na origem (no Chrome, o
+// Media Engagement Index sobe conforme voce ouve audio no site). Autoplay MUDO
+// passa sempre. Entao: tenta com som e, se em 1s nao engatou, toca mudo e liga
+// o som no primeiro gesto real. Clique sintetico nao serve — `isTrusted:false`
+// nao conta como gesto pra nenhum browser.
+const GESTOS = ["pointerdown", "keydown", "touchstart"];
+
+function acordarSom(){
+  if(!aguardandoGesto) return;
+  aguardandoGesto = false;
+  tGesto = Date.now();
+  for(const ev of GESTOS) document.removeEventListener(ev, acordarSom, true);
+  avisoMudo.classList.remove("on");
+  const v = +vol.value;
+  aplicarVolume(v > 0 ? v : (lastVol || 1));
+  if(player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo();
+}
+
+function tocarMudo(){
+  aguardandoGesto = true;
+  player.mute();
+  player.playVideo();
+  updIcon(+vol.value);
+  avisoMudo.classList.add("on");
+  // captura: precisa rodar antes do onclick dos controles
+  for(const ev of GESTOS) document.addEventListener(ev, acordarSom, true);
+}
+
+function onReady(){
+  pronto = true;
+  aplicarVolume(+vol.value);
+  if(modoLista && cfg.shuffle !== false) player.setShuffle(true);
+  player.playVideo();
+
+  setTimeout(() => {
+    if(player.getPlayerState() !== YT.PlayerState.PLAYING) tocarMudo();
+  }, 1000);
+}
+
+function onState(e){
+  atualizarFaixa();
+  if(e.data === YT.PlayerState.PLAYING) play();
+  else if(e.data === YT.PlayerState.PAUSED) pause();
+  else if(e.data === YT.PlayerState.ENDED){
+    pause();
+    if(!modoLista) next();   // no modo lista o proprio YouTube avanca (loop:1)
+  }
+}
+
+// 2 id invalido | 5 incompativel | 100 removido/privado | 101,150 embed bloqueado
+function onErro(e){
+  const limite = modoLista ? 5 : Math.max(faixas.length, 1);
+  if(++errosSeguidos > limite){ avisar("nenhuma faixa disponivel"); return; }
+  artistEl.textContent = `faixa indisponivel (erro ${e.data}) — pulando`;
+  setTimeout(next, 1200);
+}
+
+// JSON nao aceita virgula sobrando antes de ] ou }, e esse arquivo e editado na
+// mao o tempo todo — e o erro mais comum. Tenta o parse limpo; falhando, tira as
+// virgulas orfas, avisa no console e segue.
+function parseTolerante(txt){
+  try{
+    return JSON.parse(txt);
+  }catch(e){
+    const obj = JSON.parse(txt.replace(/,(\s*[}\]])/g, "$1"));   // se ainda quebrar, o erro sobe
+    console.warn("playlist.json: virgula sobrando antes de ] ou }. Funciona, mas corrija.");
+    return obj;
+  }
+}
+
+async function carregarConfig(){
+  try{
+    const r = await fetch("playlist.json");
+    if(!r.ok) throw new Error(`HTTP ${r.status} — playlist.json nao encontrado`);
+    return Object.assign({}, PADRAO, parseTolerante(await r.text()));
+  }catch(e){
+    // sem isso o erro real some e a tela mente dizendo que o arquivo esta vazio
+    erroConfig = e.message;
+    console.error("playlist.json:", e);
+    return PADRAO;
+  }
+}
 
 // embaralha (Fisher-Yates) — ordem nova a cada refresh
 function embaralhar(arr){
@@ -153,23 +298,48 @@ function embaralhar(arr){
   return arr;
 }
 
-// varre a pasta, monta playlist, carrega 1a faixa + tenta autoplay
-carregarPlaylist().then(faixas => {
-  playlist = embaralhar(faixas);
-  load(0);
-});
+// a API do YouTube chama isso sozinha quando o iframe_api termina de carregar
+window.onYouTubeIframeAPIReady = async () => {
+  cfg = await carregarConfig();
+  modoLista = !!(cfg.list || "").trim();
 
-button.onclick = () => audio.play().then(play);
+  const vars = {
+    autoplay: 1,
+    controls: 0,
+    disablekb: 1,
+    modestbranding: 1,
+    rel: 0,
+    playsinline: 1,
+  };
+  // origin protege contra postMessage de terceiros, mas em file:// vira "null"
+  if(location.origin.startsWith("http")) vars.origin = location.origin;
 
-audio.addEventListener("play",  play);
-audio.addEventListener("pause", pause);
+  if(modoLista){
+    vars.listType = "playlist";
+    vars.list = cfg.list.trim();
+    vars.loop = 1;
+  }else{
+    faixas = (cfg.videos || []).filter(v => v && (v.id || "").trim());
+    if(!faixas.length){
+      avisar(erroConfig ? "erro em playlist.json" : "configure playlist.json");
+      artistEl.textContent = erroConfig || "sem 'list' nem 'videos'";
+      return;
+    }
+    for(const v of faixas) meta[v.id] = v;
+    if(cfg.shuffle !== false) embaralhar(faixas);
+    vars.videoId = faixas[0].id;
+  }
 
-// barra progresso
-audio.addEventListener("timeupdate", () => {
-  if (audio.duration) bar.style.width = (audio.currentTime/audio.duration*100) + "%";
-});
+  player = new YT.Player("yt", {
+    width: 200,
+    height: 200,
+    videoId: vars.videoId,
+    playerVars: vars,
+    events: { onReady, onStateChange: onState, onError: onErro },
+  });
+};
 
-// fundo animado (particulas)
+// ===== FUNDO ANIMADO (particulas) =====
 const c = document.getElementById("bg");
 const ctx = c.getContext("2d");
 let W,H,parts;

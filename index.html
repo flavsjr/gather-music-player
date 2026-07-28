@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Glory Days — Flavs</title>
+<title>Gather Music Player</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,15 +15,15 @@
 
   <!-- vinil girando com a capa -->
   <div class="vinyl" id="vinyl">
-    <img src="cover.jpg" class="cover" alt="" onerror="this.style.display='none';document.getElementById('coverFallback').style.display='flex'">
+    <img id="cover" class="cover" alt="">
     <div class="cover-fallback" id="coverFallback">🎧</div>
     <div class="vinyl-hole"></div>
   </div>
 
   <div class="meta">
     <div class="now">🎧 NOW PLAYING</div>
-    <h1 id="title">Glory Days</h1>
-    <h2 id="artist">Flavs</h2>
+    <h1 id="title">Carregando…</h1>
+    <h2 id="artist"></h2>
   </div>
 
   <!-- equalizador -->
@@ -57,12 +57,17 @@
     <input type="range" id="vol" min="0" max="1" step="0.01" value="1">
   </div>
 
-  <button id="playButton" class="hidden">▶ Clique para ouvir</button>
-
 </div>
 
-<audio id="audio" autoplay></audio>
+<!-- só aparece quando o browser barra o autoplay com som: ja esta tocando
+     mudo, e qualquer clique liga o audio -->
+<div id="avisoMudo" class="aviso">🔇 clique para ligar o som</div>
 
+<!-- iframe do YouTube: quem toca o som. Fica fora da tela, nunca some com
+     display:none — escondido assim o browser pausa/derruba o player. -->
+<div id="yt"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
 <script src="script.js"></script>
 </body>
 </html>
