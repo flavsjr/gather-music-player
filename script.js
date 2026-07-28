@@ -282,7 +282,7 @@ async function carregarConfig(){
     if(!r.ok) throw new Error(`HTTP ${r.status} — playlist.json nao encontrado`);
     return Object.assign({}, PADRAO, parseTolerante(await r.text()));
   }catch(e){
-    // sem isso o erro real some e a tela mente dizendo que o arquivo esta vazio
+        // sem isso o erro real some e a tela mente dizendo que o arquivo esta vazio
     erroConfig = e.message;
     console.error("playlist.json:", e);
     return PADRAO;
@@ -298,22 +298,36 @@ function embaralhar(arr){
   return arr;
 }
 
-// a API do YouTube chama isso sozinha quando o iframe_api termina de carregar
 window.onYouTubeIframeAPIReady = async () => {
   cfg = await carregarConfig();
   modoLista = !!(cfg.list || "").trim();
 
   const vars = {
+    // Parâmetros principais
     autoplay: 1,
     controls: 0,
     disablekb: 1,
     modestbranding: 1,
     rel: 0,
     playsinline: 1,
+    enablejsapi: 1,
+    iv_load_policy: 3,        // Remove anotações
+    cc_load_policy: 0,        // Desativa legendas automáticas
+    fs: 0,                    // Remove botão de tela cheia
+    showinfo: 0,              // Remove informações do vídeo
+    autohide: 1,              // Esconde controles automaticamente
+    
+    // Parâmetros adicionais para melhor experiência
+    color: 'white',           // Cor do player
+    theme: 'dark',            // Tema escuro
+    wmode: 'opaque',          // Modo de renderização
+    loop: modoLista ? 1 : 0,  // Loop apenas se for playlist
+    
+    origin: location.origin.startsWith("http") ? location.origin : "https://www.youtube.com",
+    widget_referrer: location.href
   };
-  // origin protege contra postMessage de terceiros, mas em file:// vira "null"
-  if(location.origin.startsWith("http")) vars.origin = location.origin;
 
+  // Adiciona parâmetros específicos se for playlist
   if(modoLista){
     vars.listType = "playlist";
     vars.list = cfg.list.trim();
@@ -335,8 +349,30 @@ window.onYouTubeIframeAPIReady = async () => {
     height: 200,
     videoId: vars.videoId,
     playerVars: vars,
-    events: { onReady, onStateChange: onState, onError: onErro },
+    events: { 
+      onReady, 
+      onStateChange: onState, 
+      onError: onErro 
+    },
+    // Parâmetros adicionais de segurança
+    host: 'https://www.youtube.com',
+    origin: location.origin
   });
+
+  let ultimoEstado = -1;
+  setInterval(() => {
+    if(pronto && player && player.getPlayerState) {
+      const estado = player.getPlayerState();
+      if(estado === 2 && ultimoEstado !== 2 && Date.now() - tGesto > 5000) {
+        setTimeout(() => {
+          if(player.getPlayerState() === 2) {
+            player.playVideo();
+          }
+        }, 1000);
+      }
+      ultimoEstado = estado;
+    }
+  }, 3000);
 };
 
 // ===== FUNDO ANIMADO (particulas) =====
