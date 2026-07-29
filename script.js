@@ -34,6 +34,11 @@ let errosSeguidos = 0;
 let esperaMeta = null, tentativasMeta = 0, esperandoId = "";   // metadata do YouTube chega atrasada
 let aguardandoGesto = false, tGesto = 0;   // autoplay barrado: tocando mudo ate o 1o clique
 let erroConfig = "";
+let emAnuncio = false;
+let tentativasPular = 0;
+let estadoAnterior = -1;
+let videoOriginalId = "";
+let contadorTempoAnuncio = 0;
 
 // ===== NOME DA FAIXA =====
 // Titulo do YouTube vem sujo: "Artista - Musica (Official Video) [4K]".
@@ -145,17 +150,132 @@ function atualizarFaixa(){
   sortearCores();
 }
 
+
+function detectarAnuncio() {
+  if(!pronto || !player) return false;
+  
+  try {
+    const estado = player.getPlayerState();
+    const duracao = player.getDuration();
+    const videoData = player.getVideoData();
+    
+    if(estado !== 1) return false;
+    
+    if(duracao > 0 && duracao < 10) {
+      return true;
+    }
+    
+    if(videoData && videoData.title) {
+      const titulo = videoData.title.toLowerCase();
+      const palavrasAnuncio = [
+        'advertisement', 'commercial', 'sponsored content',
+        'pular anúncio', 'skip ad'
+      ];
+      if(palavrasAnuncio.some(palavra => titulo.includes(palavra))) {
+        return true;
+      }
+    }
+    
+    return false;
+    
+  } catch(e) {
+    return false;
+  }
+}
+
+function pularAnuncio() {
+  if(!pronto || !player || !emAnuncio) return;
+  
+  try {
+    tentativasPular++;
+    
+    const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button');
+    if(skipBtn && skipBtn.style.display !== 'none' && skipBtn.offsetParent !== null) {
+      skipBtn.click();
+      emAnuncio = false;
+      tentativasPular = 0;
+      return;
+    }
+    
+    if(tentativasPular === 1) {
+      const videoId = player.getVideoData().video_id;
+      if(videoId) {
+        player.loadVideoById(videoId);
+        setTimeout(() => {
+          if(emAnuncio) {
+            player.playVideo();
+          }
+        }, 1000);
+        return;
+      }
+    }
+    
+    if(tentativasPular >= 2) {
+      player.playVideo();
+      if(tentativasPular >= 3) {
+        emAnuncio = false;
+        tentativasPular = 0;
+      }
+      return;
+    }
+    
+  } catch(e) {
+    emAnuncio = false;
+    tentativasPular = 0;
+  }
+}
+
+function verificarAnuncioReal() {
+  if(!pronto || !player) return false;
+  
+  try {
+    const temBotaoPular = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern');
+    if(temBotaoPular && temBotaoPular.offsetParent !== null) {
+      return true;
+    }
+    
+    const temOverlay = document.querySelector('.ytp-ad-overlay-container');
+    if(temOverlay && temOverlay.offsetParent !== null) {
+      return true;
+    }
+    
+    const videoData = player.getVideoData();
+    if(videoData && videoData.title) {
+      const titulo = videoData.title.toLowerCase();
+      if(titulo.includes('anúncio') || titulo.includes('anuncio') || 
+         titulo.includes('ad') || titulo.includes('commercial')) {
+        return true;
+      }
+    }
+    
+    return false;
+    
+  } catch(e) {
+    return false;
+  }
+}
+
 // ===== CONTROLES =====
 function carregarManual(i){
   if(!faixas.length) return;
-  idx = (i + faixas.length) % faixas.length;   // wrap circular
+  idx = (i + faixas.length) % faixas.length;
   player.loadVideoById(faixas[idx].id);
 }
-function next(){ modoLista ? player.nextVideo()     : carregarManual(idx + 1); }
-function prev(){ modoLista ? player.previousVideo() : carregarManual(idx - 1); }
+function next(){ 
+  if(modoLista) {
+    player.nextVideo();
+  } else {
+    carregarManual(idx + 1);
+  }
+}
+function prev(){ 
+  if(modoLista) {
+    player.previousVideo();
+  } else {
+    carregarManual(idx - 1);
+  }
+}
 
-// O gesto que liga o som (ver acordarSom) nao pode valer como clique nos
-// controles: sem isso, o clique no ▶ ligaria o som e pausaria no mesmo ato.
 function gestoDoSom(){ return Date.now() - tGesto < 400; }
 
 toggle.onclick = () => {
@@ -246,13 +366,44 @@ function onReady(){
 }
 
 function onState(e){
-  atualizarFaixa();
-  if(e.data === YT.PlayerState.PLAYING) play();
-  else if(e.data === YT.PlayerState.PAUSED) pause();
-  else if(e.data === YT.PlayerState.ENDED){
+  estadoAnterior = e.data;
+  
+  if(e.data === YT.PlayerState.PLAYING) {
+    play();
+    
+    setTimeout(() => {
+      if(verificarAnuncioReal()) {
+        if(!emAnuncio) {
+          emAnuncio = true;
+          tentativasPular = 0;
+          pularAnuncio();
+        }
+      } else {
+        if(emAnuncio) {
+          emAnuncio = false;
+          tentativasPular = 0;
+        }
+      }
+    }, 1500);
+    
+  } else if(e.data === YT.PlayerState.PAUSED) {
     pause();
-    if(!modoLista) next();   // no modo lista o proprio YouTube avanca (loop:1)
+    if(e.data === 2 && estadoAnterior === 1 && !gestoDoSom()) {
+      setTimeout(() => {
+        if(verificarAnuncioReal()) {
+          emAnuncio = true;
+          tentativasPular = 0;
+          pularAnuncio();
+        }
+      }, 500);
+    }
+    
+  } else if(e.data === YT.PlayerState.ENDED){
+    pause();
+    if(!modoLista) next();
   }
+  
+  atualizarFaixa();
 }
 
 // 2 id invalido | 5 incompativel | 100 removido/privado | 101,150 embed bloqueado
@@ -270,7 +421,7 @@ function parseTolerante(txt){
   try{
     return JSON.parse(txt);
   }catch(e){
-    const obj = JSON.parse(txt.replace(/,(\s*[}\]])/g, "$1"));   // se ainda quebrar, o erro sobe
+    const obj = JSON.parse(txt.replace(/,(\s*[}\]])/g, "$1"));
     console.warn("playlist.json: virgula sobrando antes de ] ou }. Funciona, mas corrija.");
     return obj;
   }
@@ -298,6 +449,38 @@ function embaralhar(arr){
   return arr;
 }
 
+// ===== MONITOR SUAVE ANTI-ANÚNCIO =====
+function iniciarMonitorAntiAnuncio() {
+  setInterval(() => {
+    if(!pronto || !player) return;
+    
+    try {
+      const estado = player.getPlayerState();
+      
+      // Só verifica se estiver tocando
+      if(estado === 1) {
+        // Verifica se realmente tem um anúncio
+        if(verificarAnuncioReal()) {
+          if(!emAnuncio) {
+            emAnuncio = true;
+            tentativasPular = 0;
+            pularAnuncio();
+          }
+        } else {
+          // Se não tiver anúncio, reseta estado
+          if(emAnuncio) {
+            emAnuncio = false;
+            tentativasPular = 0;
+          }
+        }
+      }
+      
+    } catch(e) {
+      // Silencia erros para não poluir o console
+    }
+  }, 3000); // Verifica a cada 3 segundos
+}
+
 window.onYouTubeIframeAPIReady = async () => {
   cfg = await carregarConfig();
   modoLista = !!(cfg.list || "").trim();
@@ -316,13 +499,13 @@ window.onYouTubeIframeAPIReady = async () => {
     fs: 0,                    // Remove botão de tela cheia
     showinfo: 0,              // Remove informações do vídeo
     autohide: 1,              // Esconde controles automaticamente
-    
+
     // Parâmetros adicionais para melhor experiência
     color: 'white',           // Cor do player
     theme: 'dark',            // Tema escuro
     wmode: 'opaque',          // Modo de renderização
     loop: modoLista ? 1 : 0,  // Loop apenas se for playlist
-    
+
     origin: location.origin.startsWith("http") ? location.origin : "https://www.youtube.com",
     widget_referrer: location.href
   };
@@ -354,25 +537,11 @@ window.onYouTubeIframeAPIReady = async () => {
       onStateChange: onState, 
       onError: onErro 
     },
-    // Parâmetros adicionais de segurança
     host: 'https://www.youtube.com',
     origin: location.origin
   });
 
-  let ultimoEstado = -1;
-  setInterval(() => {
-    if(pronto && player && player.getPlayerState) {
-      const estado = player.getPlayerState();
-      if(estado === 2 && ultimoEstado !== 2 && Date.now() - tGesto > 5000) {
-        setTimeout(() => {
-          if(player.getPlayerState() === 2) {
-            player.playVideo();
-          }
-        }, 1000);
-      }
-      ultimoEstado = estado;
-    }
-  }, 3000);
+  iniciarMonitorAntiAnuncio();
 };
 
 // ===== FUNDO ANIMADO (particulas) =====
